@@ -1,0 +1,20 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* optional: custom colors for bg-card, text-foreground etc */
+:root {
+  --color-primary: #2563eb;
+  --color-muted-foreground: #6b7280;
+  --color-foreground: #111827;
+  --color-background: #f9fafb;
+}
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow-x: auto;
+  overflow-y: auto; /* removes scrollbars */
+  font-family: sans-serif; /* optional, cleaner base */
+}
