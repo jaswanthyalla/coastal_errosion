@@ -23,3 +23,6 @@ env/
 ehthumbs.db
 Thumbs.db
 desktop.ini
+
+# Jupyter Notebook
+.ipynb_checkpoints/
