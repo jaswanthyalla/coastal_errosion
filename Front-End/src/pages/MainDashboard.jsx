@@ -24,6 +24,8 @@ ChartJS.register(
   Filler
 );
 
+const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+
 const Dashboard = () => {
   const [summary, setSummary] = useState(null);
   const [images, setImages] = useState([]);
@@ -31,7 +33,7 @@ const Dashboard = () => {
 
   useEffect(() => {
     axios
-      .get("http://127.0.0.1:8000/api/dashboard-data/") // ✅ backend should return { summary, images, logs }
+      .get(`${API_URL}/api/dashboard-data/`) // ✅ backend should return { summary, images, logs }
       .then((res) => {
         setSummary(res.data.summary);
         setImages(res.data.images);
@@ -178,7 +180,7 @@ const Dashboard = () => {
             className="border rounded-lg overflow-hidden shadow hover:shadow-xl transition-shadow cursor-pointer"
           >
             <img
-              src={`http://127.0.0.1:8000${img.thumbnail_url}`}
+              src={`${API_URL}${img.thumbnail_url}`}
               alt={`NDWI ${img.year}`}
               className="w-full h-32 object-cover"
             />

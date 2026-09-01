@@ -2,6 +2,8 @@ import React, { useEffect, useState } from "react";
 import axios from "axios";
 import Map from "../components/ui/Map";
 
+const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+
 const ResultsVisualization = () => {
   const [shorelineData, setShorelineData] = useState(null);
   const [erosionGeoJSON, setErosionGeoJSON] = useState(null);
@@ -10,17 +12,17 @@ const ResultsVisualization = () => {
 
   useEffect(() => {
     // Fetch shorelines (WGS84 converted geojson)
-    axios.get("http://127.0.0.1:8000/extracted-shorelines/")
+    axios.get(`${API_URL}/extracted-shorelines/`)
       .then(res => setShorelineData(res.data))
       .catch(err => console.error(err));
 
     // Fetch erosion geojson
-    axios.get("http://127.0.0.1:8000/erosion-geojson/")
+    axios.get(`${API_URL}/erosion-geojson/`)
       .then(res => setErosionGeoJSON(res.data))
       .catch(err => console.error(err));
 
     // Fetch dashboard data for stats
-    axios.get("http://127.0.0.1:8000/api/dashboard-data/")
+    axios.get(`${API_URL}/api/dashboard-data/`)
       .then(res => {
         if (res.data.summary.erosion_stats) {
           setStats(res.data.summary.erosion_stats);
