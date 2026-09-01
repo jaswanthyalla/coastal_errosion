@@ -39,6 +39,11 @@ from services import (
     erosion_accretion_calculator
 )
 
+# Ensure data directories exist before mounting static files
+os.makedirs("data/cleaned_output", exist_ok=True)
+os.makedirs("data/output", exist_ok=True)
+os.makedirs("data/shorelines_data", exist_ok=True)
+
 # Mount the folder with your images
 app.mount("/static", StaticFiles(directory="data/cleaned_output"), name="static")
 
@@ -56,14 +61,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Ensure data directories exist before mounting static files
-os.makedirs("data/cleaned_output", exist_ok=True)
-os.makedirs("data/output", exist_ok=True)
-os.makedirs("data/shorelines_data", exist_ok=True)
-
-# Static file serving for images
-app.mount("/static", StaticFiles(directory="data/cleaned_output"), name="static")
 
 def update_run_metadata(new_data):
     import json, os
