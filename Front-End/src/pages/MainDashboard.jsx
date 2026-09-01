@@ -81,8 +81,7 @@ const Dashboard = () => {
 
   return (
     <div className="bg-gray-100 p-6 min-h-screen flex flex-col gap-6">
-  {/* Top Summary Cards */}
-  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
     <div className="bg-white shadow-lg rounded-lg p-5 flex flex-col items-center">
       <p className="text-gray-500">AOI Area (km²)</p>
       <h2 className="text-2xl font-bold">{summary.aoi_km2.toFixed(2)}</h2>
@@ -99,7 +98,45 @@ const Dashboard = () => {
       <p className="text-gray-500">Years Covered</p>
       <h2 className="text-2xl font-bold">{summary.start_year} - {summary.end_year}</h2>
     </div>
+    <div className="bg-white shadow-lg rounded-lg p-5 flex flex-col items-center border-b-4 border-purple-500">
+      <p className="text-gray-500">Prediction Target</p>
+      <h2 className="text-2xl font-bold text-purple-600">{summary.prediction_year || 2025}</h2>
+    </div>
   </div>
+
+  {/* Coordinates Display */}
+  {summary.coordinates && summary.coordinates.length > 0 && (
+    <div className="bg-white shadow-lg rounded-lg p-5">
+      <h3 className="font-semibold mb-2 text-gray-700">Selected AOI Coordinates (Longitude, Latitude)</h3>
+      <div className="bg-gray-50 border p-3 rounded h-32 overflow-y-auto text-sm font-mono text-gray-600">
+        {summary.coordinates.map((poly, i) => {
+          // Normalize the nesting: extract the actual coordinate pairs
+          // If poly[0] is an array of arrays, we need to unwrap it
+          let ring = poly;
+          if (Array.isArray(ring[0]) && Array.isArray(ring[0][0])) {
+            ring = ring[0];
+          }
+          if (Array.isArray(ring[0]) && Array.isArray(ring[0][0])) {
+            ring = ring[0];
+          }
+
+          return (
+            <div key={i} className="mb-2">
+              <strong>Polygon {i+1}:</strong>
+              <ul className="ml-4 list-disc list-inside">
+                {ring.map((coord, j) => {
+                  if (!coord || typeof coord[0] !== 'number') return null;
+                  return (
+                    <li key={j}>[{coord[0].toFixed(5)}, {coord[1].toFixed(5)}]</li>
+                  );
+                })}
+              </ul>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  )}
 
   {/* Middle: Charts */}
   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

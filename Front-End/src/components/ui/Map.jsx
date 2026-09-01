@@ -7,23 +7,43 @@ import TileLayer from "ol/layer/Tile";
 import VectorLayer from "ol/layer/Vector";
 import VectorSource from "ol/source/Vector";
 import XYZ from "ol/source/XYZ";
-import Draw, { createBox } from "ol/interaction/Draw";
-import { Modify, Snap } from "ol/interaction";
+import Translate from "ol/interaction/Translate";
+import Draw, { createBox, createRegularPolygon } from "ol/interaction/Draw";
+import { Snap } from "ol/interaction";
+import Collection from "ol/Collection";
 import GeoJSON from "ol/format/GeoJSON";
 import { Style, Fill, Stroke, Circle as CircleStyle } from "ol/style";
 import { fromLonLat } from "ol/proj";
-import { Trash2, Edit2, Save, ZoomIn, ZoomOut } from "lucide-react";
+import { getArea } from "ol/sphere";
+import { Trash2, Edit2, Move, ZoomIn, ZoomOut, Square, Maximize } from "lucide-react";
 
-const Map = ({ onCoordinatesReady, shorelineData }) => {
+const Map = ({ onCoordinatesReady, shorelineData, erosionGeoJSON, transectsData }) => {
   const mapElementRef = useRef(null);
   const mapRef = useRef(null);
   const vectorSourceRef = useRef(null);
   const shorelineSourceRef = useRef(null);
+  const erosionSourceRef = useRef(null);
+  const transectsSourceRef = useRef(null);
   const drawRef = useRef(null);
   const modifyRef = useRef(null);
 
   const [isDrawing, setIsDrawing] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [drawMode, setDrawMode] = useState("rectangle"); // "square", "rectangle", "polygon"
+  const drawModeRef = useRef(drawMode);
+
+  useEffect(() => {
+    drawModeRef.current = drawMode;
+    if (mapRef.current && drawRef.current) {
+      // Recreate draw interaction when mode changes to update the 'type'
+      const isActive = drawRef.current.getActive();
+      mapRef.current.removeInteraction(drawRef.current);
+      if (window.createDrawInteraction) {
+        window.createDrawInteraction();
+      }
+      drawRef.current.setActive(isActive);
+    }
+  }, [drawMode]);
 
   useEffect(() => {
     const satelliteLayer = new TileLayer({
@@ -38,16 +58,32 @@ const Map = ({ onCoordinatesReady, shorelineData }) => {
       }),
     });
 
-    const vectorSource = new VectorSource();
+    const editFeatures = new Collection();
+    const vectorSource = new VectorSource({ features: editFeatures });
     vectorSourceRef.current = vectorSource;
 
     const vectorLayer = new VectorLayer({
       source: vectorSource,
-      style: new Style({
-        fill: new Fill({ color: "rgba(71, 166, 255, 0.18)" }),
-        stroke: new Stroke({ color: "rgba(71, 166, 255, 1)", width: 2 }),
-        image: new CircleStyle({ radius: 5, fill: new Fill({ color: "#09f" }) }),
-      }),
+      style: [
+        // Outer Glow / Shadow
+        new Style({
+          stroke: new Stroke({ color: "rgba(59, 130, 246, 0.4)", width: 10 }),
+        }),
+        // Inner Glow
+        new Style({
+          stroke: new Stroke({ color: "rgba(56, 189, 248, 0.6)", width: 6 }),
+        }),
+        // Core Line & Fill
+        new Style({
+          fill: new Fill({ color: "rgba(15, 23, 42, 0.4)" }), // Dark glass effect
+          stroke: new Stroke({ color: "rgba(255, 255, 255, 0.9)", width: 2 }),
+          image: new CircleStyle({ 
+            radius: 7, 
+            fill: new Fill({ color: "#fff" }),
+            stroke: new Stroke({ color: "#3b82f6", width: 2 })
+          }),
+        })
+      ],
     });
 
     const shorelineSource = new VectorSource();
@@ -56,6 +92,7 @@ const Map = ({ onCoordinatesReady, shorelineData }) => {
     const shorelineLayer = new VectorLayer({
       source: shorelineSource,
       style: new Style({
+        stroke: new Stroke({ color: "#ff4d4d", width: 2 }), // For LineString
         image: new CircleStyle({
           radius: 4,
           fill: new Fill({ color: "#ff4d4d" }), // Red color for predicted points
@@ -64,58 +101,180 @@ const Map = ({ onCoordinatesReady, shorelineData }) => {
       }),
     });
 
+    const erosionSource = new VectorSource();
+    erosionSourceRef.current = erosionSource;
+
+    const erosionLayer = new VectorLayer({
+      source: erosionSourceRef.current,
+      style: (feature) => {
+        const type = feature.get('type');
+        if (type === 'erosion') {
+          return new Style({
+            stroke: new Stroke({ color: "#ef4444", width: 4, lineDash: [4, 6] }), // Red dotted line for erosion
+          });
+        } else if (type === 'accretion') {
+          return new Style({
+            stroke: new Stroke({ color: "#10b981", width: 4 }), // Green solid line for accretion
+          });
+        }
+      },
+      zIndex: 6,
+    });
+
+    const transectsSource = new VectorSource();
+    transectsSourceRef.current = transectsSource;
+
+    const transectsLayer = new VectorLayer({
+      source: transectsSource,
+      style: new Style({
+        stroke: new Stroke({ color: "#facc15", width: 2, lineDash: [4, 4] }), // Yellow dashed line
+      }),
+    });
+
     const map = new OlMap({
       target: mapElementRef.current,
-      layers: [satelliteLayer, labelsLayer, vectorLayer, shorelineLayer],
+      layers: [satelliteLayer, labelsLayer, vectorLayer, shorelineLayer, erosionLayer, transectsLayer],
       view: new View({
         center: fromLonLat([80.6480, 16.5062]), // Vijayawada
         zoom: 12,
       }),
       controls: [],
     });
+    mapRef.current = map;
 
-    drawRef.current = new Draw({ 
-      source: vectorSource,
-      type: "Circle",
-      geometryFunction: createBox()
-    });
+
+
+    window.createDrawInteraction = () => {
+      if (drawRef.current && mapRef.current) {
+        mapRef.current.removeInteraction(drawRef.current);
+      }
+      
+      const customRotatedRect = function (coordinates, geometry) {
+        if (!geometry) {
+          geometry = new Polygon([]);
+        }
+        const start = coordinates[0];
+        const end = coordinates[1];
+        
+        // Calculate angle and raw distance
+        const dx = end[0] - start[0];
+        const dy = end[1] - start[1];
+        let distance = Math.sqrt(dx * dx + dy * dy);
+        const angle = Math.atan2(dy, dx);
+
+        // Automatically constrain the box size to a safe maximum (~30km in Web Mercator)
+        // This prevents the Google Earth Engine download from crashing due to file size limits.
+        const MAX_DISTANCE = 30000;
+        if (distance > MAX_DISTANCE) {
+          distance = MAX_DISTANCE;
+        }
+
+        // Set rectangle dimensions (width = distance, height = distance / 2)
+        const width = distance;
+        const height = distance * 0.25; // Adjusted to be 1/4 of width for a 4:1 aspect ratio
+        
+        const points = [
+          [width, height],
+          [width, -height],
+          [-width, -height],
+          [-width, height],
+          [width, height]
+        ];
+        
+        const cos = Math.cos(angle);
+        const sin = Math.sin(angle);
+        
+        const rotatedPoints = points.map(p => [
+          center[0] + (p[0] * cos - p[1] * sin),
+          center[1] + (p[0] * sin + p[1] * cos)
+        ]);
+        
+        geometry.setCoordinates([rotatedPoints]);
+        return geometry;
+      };
+
+      const boxFn = createBox();
+
+      drawRef.current = new Draw({ 
+        source: vectorSourceRef.current,
+        type: drawModeRef.current === 'polygon' ? 'Polygon' : 'Circle',
+        geometryFunction: drawModeRef.current === 'polygon' ? undefined : function(coordinates, geometry) {
+          if (drawModeRef.current === 'square') {
+            return customRotatedRect(coordinates, geometry);
+          } else {
+            return boxFn(coordinates, geometry);
+          }
+        },
+        style: [
+          new Style({ stroke: new Stroke({ color: "rgba(56, 189, 248, 0.4)", width: 8 }) }),
+          new Style({
+            fill: new Fill({ color: "rgba(15, 23, 42, 0.2)" }),
+            stroke: new Stroke({ color: "rgba(255, 255, 255, 0.8)", width: 2, lineDash: [5, 5] }),
+            image: new CircleStyle({ radius: 6, fill: new Fill({ color: "#38bdf8" }) })
+          })
+        ]
+      });
+      
+      drawRef.current.on('drawstart', () => {
+        vectorSourceRef.current.clear();
+      });
+
+      drawRef.current.on('drawend', (event) => {
+        const feature = event.feature;
+        const geom = feature.getGeometry();
+        
+        const geom4326 = geom.clone().transform("EPSG:3857", "EPSG:4326");
+        const areaSqMeters = getArea(geom4326);
+        const maxAreaSqMeters = 100_000_000; 
+
+        if (areaSqMeters > maxAreaSqMeters) {
+          alert(`The drawn area is too large for the AI model! \n\nYou drew ~${(areaSqMeters / 1_000_000).toFixed(2)} sq km. \nThe maximum allowed is 100 sq km. \n\nPlease draw a smaller shape.`);
+          setTimeout(() => vectorSourceRef.current.clear(), 10);
+          if (onCoordinatesReady) onCoordinatesReady(null);
+          return;
+        }
+
+        const polygonCoordinates = geom4326.getCoordinates();
+        if (onCoordinatesReady && polygonCoordinates.length > 0) {
+          onCoordinatesReady(polygonCoordinates);
+        }
+
+        setTimeout(() => {
+          if (modifyRef.current && !modifyRef.current.getActive()) {
+            toggleEditing();
+          }
+        }, 50);
+      });
+
+      drawRef.current.setActive(isDrawing);
+      if (mapRef.current) mapRef.current.addInteraction(drawRef.current);
+    };
+
+    window.createDrawInteraction();
+
+    modifyRef.current = new Translate({ features: editFeatures });
     
-    // Clear any previous drawings when you start drawing a new one
-    drawRef.current.on('drawstart', () => {
-      vectorSourceRef.current.clear();
-    });
-
-    // When drawing is complete, extract and send coordinates to parent
-    drawRef.current.on('drawend', (event) => {
-      const extent = event.feature.getGeometry().getExtent();
-      const minLonLat = transform([extent[0], extent[1]], "EPSG:3857", "EPSG:4326");
-      const maxLonLat = transform([extent[2], extent[3]], "EPSG:3857", "EPSG:4326");
-
-      if (minLonLat[0] !== maxLonLat[0] && minLonLat[1] !== maxLonLat[1]) {
-        const polygonCoordinates = [[
-          [minLonLat[0], minLonLat[1]],
-          [minLonLat[0], maxLonLat[1]],
-          [maxLonLat[0], maxLonLat[1]],
-          [maxLonLat[0], minLonLat[1]],
-          [minLonLat[0], minLonLat[1]]
-        ]];
-        if (onCoordinatesReady) onCoordinatesReady(polygonCoordinates);
+    modifyRef.current.on('translateend', (event) => {
+      const features = event.features;
+      if (features && features.getLength() > 0) {
+        const feature = features.item(0);
+        const geom = feature.getGeometry();
+        
+        const geom4326 = geom.clone().transform("EPSG:3857", "EPSG:4326");
+        const polygonCoordinates = geom4326.getCoordinates();
+        
+        if (onCoordinatesReady && polygonCoordinates.length > 0) {
+          onCoordinatesReady(polygonCoordinates);
+        }
       }
     });
 
-    drawRef.current.setActive(false);
-    map.addInteraction(drawRef.current);
-
-    modifyRef.current = new Modify({ source: vectorSource });
     modifyRef.current.setActive(false);
     map.addInteraction(modifyRef.current);
 
-    map.addInteraction(new Snap({ source: vectorSource }));
-
-    mapRef.current = map;
-
     return () => {
-      map.setTarget(null);
+      if (mapRef.current) mapRef.current.setTarget(null);
+      delete window.createDrawInteraction;
     };
   }, []);
 
@@ -135,6 +294,42 @@ const Map = ({ onCoordinatesReady, shorelineData }) => {
       }
     }
   }, [shorelineData]);
+
+  // Update transects data when it changes
+  useEffect(() => {
+    if (transectsData && transectsData.type === "FeatureCollection" && transectsSourceRef.current) {
+      transectsSourceRef.current.clear();
+      try {
+        const features = new GeoJSON().readFeatures(transectsData, {
+          featureProjection: "EPSG:3857",
+        });
+        transectsSourceRef.current.addFeatures(features);
+
+        if (features.length > 0) {
+          const extent = transectsSourceRef.current.getExtent();
+          mapRef.current.getView().fit(extent, { padding: [50, 50, 50, 50], duration: 1000 });
+        }
+      } catch (err) {
+        console.error("Failed to render transects:", err);
+      }
+    }
+  }, [transectsData]);
+
+  // Update erosion data when it changes
+  useEffect(() => {
+    if (erosionGeoJSON && erosionSourceRef.current) {
+      erosionSourceRef.current.clear();
+      const features = new GeoJSON().readFeatures(erosionGeoJSON, {
+        featureProjection: "EPSG:3857",
+      });
+      erosionSourceRef.current.addFeatures(features);
+
+      if (features.length > 0) {
+        const extent = erosionSourceRef.current.getExtent();
+        mapRef.current.getView().fit(extent, { padding: [50, 50, 50, 50], duration: 1000 });
+      }
+    }
+  }, [erosionGeoJSON]);
 
   const toggleDrawing = () => {
     modifyRef.current.setActive(false);
@@ -169,11 +364,25 @@ const Map = ({ onCoordinatesReady, shorelineData }) => {
           background: "rgba(255,255,255,0.2)",
         }}
       >
-        <button onClick={zoomIn}><ZoomIn /></button>
-        <button onClick={zoomOut}><ZoomOut /></button>
-        <button onClick={toggleDrawing}><Edit2 color={isDrawing ? "blue" : "black"} /></button>
-        <button onClick={toggleEditing}><Save color={isEditing ? "blue" : "black"} /></button>
-        <button onClick={clearPolygons}><Trash2 color="red" /></button>
+        <button onClick={zoomIn} title="Zoom In"><ZoomIn /></button>
+        <button onClick={zoomOut} title="Zoom Out"><ZoomOut /></button>
+        <button onClick={toggleDrawing} title="Draw AOI">
+          <Edit2 color={isDrawing ? "blue" : "black"} />
+        </button>
+        <button 
+          onClick={() => {
+            setDrawMode(prev => prev === 'rectangle' ? 'square' : prev === 'square' ? 'polygon' : 'rectangle');
+          }} 
+          title={`Toggle Mode (Current: ${drawMode})`}
+        >
+          {drawMode === 'square' && <Square color="purple" />}
+          {drawMode === 'rectangle' && <Maximize color="purple" />}
+          {drawMode === 'polygon' && <Edit2 color="purple" />}
+        </button>
+        <button onClick={toggleEditing} title="Move AOI">
+          <Move color={isEditing ? "blue" : "black"} />
+        </button>
+        <button onClick={clearPolygons} title="Clear Map"><Trash2 color="red" /></button>
       </div>
       <div ref={mapElementRef} className="w-full h-full rounded-lg shadow-lg" />
     </div>

@@ -14,8 +14,8 @@ function App() {
     <ErrorBoundary>
       <ScrollToTop />
       <Header />
-      {/* Main container fills full screen minus header */}
-      <main className="absolute top-16 left-0 right-0 bottom-0 overflow-hidden">
+      {/* Main container fills full screen */}
+      <main className="absolute top-0 left-0 right-0 bottom-0 overflow-hidden">
         <Routes>
           <Route path="/" element={<LandingPage />} />
           <Route path="/main-dashboard" element={<MainDashboard />} />

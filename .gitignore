@@ -26,3 +26,9 @@ desktop.ini
 
 # Jupyter Notebook
 .ipynb_checkpoints/
+
+# Data
+coastal-backend/data/output/*
+coastal-backend/data/cleaned_output/*
+coastal-backend/data/shorelines_data/*
+!coastal-backend/data/shorelines_data/.gitkeep

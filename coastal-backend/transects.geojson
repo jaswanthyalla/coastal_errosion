@@ -1,0 +1,32 @@
+{
+"type": "FeatureCollection",
+"name": "transects",
+"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:EPSG::32644" } },
+"features": [
+{ "type": "Feature", "properties": { "Transect": 0 }, "geometry": { "type": "LineString", "coordinates": [ [ 510618.191789328702725, 1760872.675513074500486 ], [ 509180.250094691175036, 1762262.755972192855552 ] ] } },
+{ "type": "Feature", "properties": { "Transect": 1 }, "geometry": { "type": "LineString", "coordinates": [ [ 510627.797996726003475, 1760892.553639730205759 ], [ 509189.855067398049869, 1762282.632821645820513 ] ] } },
+{ "type": "Feature", "properties": { "Transect": 2 }, "geometry": { "type": "LineString", "coordinates": [ [ 510637.408439863938838, 1760902.494993386790156 ], [ 509199.464594249380752, 1762292.573227465618402 ] ] } },
+{ "type": "Feature", "properties": { "Transect": 3 }, "geometry": { "type": "LineString", "coordinates": [ [ 510723.902044199814554, 1760991.967369413934648 ], [ 509285.949949664936867, 1762382.037070480175316 ] ] } },
+{ "type": "Feature", "properties": { "Transect": 4 }, "geometry": { "type": "LineString", "coordinates": [ [ 510733.512401897925884, 1761001.908765856875107 ], [ 509295.5593908081064, 1762391.977518796222284 ] ] } },
+{ "type": "Feature", "properties": { "Transect": 5 }, "geometry": { "type": "LineString", "coordinates": [ [ 510743.122751058079302, 1761011.850166585296392 ], [ 509305.168823373969644, 1762401.917971355374902 ] ] } },
+{ "type": "Feature", "properties": { "Transect": 6 }, "geometry": { "type": "LineString", "coordinates": [ [ 510781.564062146586366, 1761051.615812179166824 ], [ 509343.606468033511192, 1762441.67982420604676 ] ] } },
+{ "type": "Feature", "properties": { "Transect": 7 }, "geometry": { "type": "LineString", "coordinates": [ [ 511072.195011484378483, 1761757.039719569031149 ], [ 509072.195214843319263, 1761756.137812752276659 ] ] } },
+{ "type": "Feature", "properties": { "Transect": 8 }, "geometry": { "type": "LineString", "coordinates": [ [ 510791.170046693761833, 1761071.494013384450227 ], [ 509353.211217732634395, 1762461.556748016737401 ] ] } },
+{ "type": "Feature", "properties": { "Transect": 9 }, "geometry": { "type": "LineString", "coordinates": [ [ 510800.780340165714733, 1761081.435439769877121 ], [ 509362.820594688411802, 1762471.497226305538788 ] ] } },
+{ "type": "Feature", "properties": { "Transect": 10 }, "geometry": { "type": "LineString", "coordinates": [ [ 510810.390625195112079, 1761091.376870538573712 ], [ 509372.429962973343208, 1762481.437708740588278 ] ] } },
+{ "type": "Feature", "properties": { "Transect": 11 }, "geometry": { "type": "LineString", "coordinates": [ [ 510129.509278516692575, 1760796.754149182699621 ], [ 510072.530945847101975, 1762795.942351830657572 ] ] } },
+{ "type": "Feature", "properties": { "Transect": 12 }, "geometry": { "type": "LineString", "coordinates": [ [ 510895.371157596120611, 1761159.403587060282007 ], [ 509457.403082463657483, 1762549.456756870495155 ] ] } },
+{ "type": "Feature", "properties": { "Transect": 13 }, "geometry": { "type": "LineString", "coordinates": [ [ 510579.73297042719787, 1760872.657265595626086 ], [ 509141.793668970873114, 1762262.740200289525092 ] ] } },
+{ "type": "Feature", "properties": { "Transect": 14 }, "geometry": { "type": "LineString", "coordinates": [ [ 510645.2613200363121, 1760940.441819977480918 ], [ 509207.315833305416163, 1762330.518356428015977 ] ] } },
+{ "type": "Feature", "properties": { "Transect": 15 }, "geometry": { "type": "LineString", "coordinates": [ [ 510710.789386777032632, 1761008.226691126124933 ], [ 509272.837714324181434, 1762398.296828813618049 ] ] } },
+{ "type": "Feature", "properties": { "Transect": 16 }, "geometry": { "type": "LineString", "coordinates": [ [ 510776.317145184497349, 1761076.011852744501084 ], [ 509338.359286614577286, 1762466.075591202825308 ] ] } },
+{ "type": "Feature", "properties": { "Transect": 17 }, "geometry": { "type": "LineString", "coordinates": [ [ 510834.933768407965545, 1761146.589581214589998 ], [ 509396.96996514959028, 1762536.647170136449859 ] ] } },
+{ "type": "Feature", "properties": { "Transect": 18 }, "geometry": { "type": "LineString", "coordinates": [ [ 510906.488631004991475, 1761200.728193037677556 ], [ 509468.51848366757622, 1762590.779219211544842 ] ] } },
+{ "type": "Feature", "properties": { "Transect": 19 }, "geometry": { "type": "LineString", "coordinates": [ [ 510916.09881751606008, 1761210.669670763192698 ], [ 509478.127753578650299, 1762600.719748738454655 ] ] } },
+{ "type": "Feature", "properties": { "Transect": 20 }, "geometry": { "type": "LineString", "coordinates": [ [ 510589.347675116325263, 1760872.661821252666414 ], [ 509151.407775374304038, 1762262.744137063622475 ] ] } },
+{ "type": "Feature", "properties": { "Transect": 21 }, "geometry": { "type": "LineString", "coordinates": [ [ 510637.408439961320255, 1760902.494993487605825 ], [ 509199.464594151999336, 1762292.573227364802733 ] ] } },
+{ "type": "Feature", "properties": { "Transect": 22 }, "geometry": { "type": "LineString", "coordinates": [ [ 510743.122751103830524, 1761011.850166632793844 ], [ 509305.168823328218423, 1762401.917971307877451 ] ] } },
+{ "type": "Feature", "properties": { "Transect": 23 }, "geometry": { "type": "LineString", "coordinates": [ [ 510820.000901576073375, 1761101.318305481225252 ], [ 509382.039322787721176, 1762491.37819553213194 ] ] } },
+{ "type": "Feature", "properties": { "Transect": 24 }, "geometry": { "type": "LineString", "coordinates": [ [ 510225.610292893485166, 1760906.100831932388246 ], [ 510168.616278201225214, 1762905.288587569259107 ] ] } }
+]
+}

@@ -40,8 +40,12 @@ def process_ndwi_for_aoi(ee_polygons, output_folder="data/output"):
         AOI = ee.FeatureCollection([ee.Feature(ee_polygons)])
 
     results_summary = []
+    
+    import datetime
+    import concurrent.futures
+    current_year = datetime.datetime.now().year
 
-    for year in range(2016, 2026):
+    def process_year(year):
         dataset = "COPERNICUS/S2" if year <= 2018 else "COPERNICUS/S2_SR_HARMONIZED"
         start = ee.Date.fromYMD(year - 1, 11, 1)
         end = ee.Date.fromYMD(year, 2, 28)
@@ -107,17 +111,27 @@ def process_ndwi_for_aoi(ee_polygons, output_folder="data/output"):
             plt.savefig(os.path.join(static_folder, f"plot_NDWI_{year}.png"), bbox_inches='tight', dpi=100)
             plt.close()
 
-            print(f"✅ Year {year}: Downloaded successfully. Water: {water_percentage:.2f}%")
+            print(f"[SUCCESS] Year {year}: Downloaded successfully. Water: {water_percentage:.2f}%")
         except Exception as e:
             local_path = None
             water_percentage = None
             download_status = f"failed: {str(e)}"
-            print(f"❌ Year {year}: Failed - {str(e)[:100]}")
-        results_summary.append({
+            print(f"[ERROR] Year {year}: Failed - {str(e)[:100]}")
+            
+        return {
             "year": year,
             "ndwi_file": local_path,
             "download_status": download_status,
             "water_percentage": water_percentage
-        })
+        }
+
+    # Parallelize downloading
+    years_to_process = list(range(2016, current_year + 1))
+    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+        results = list(executor.map(process_year, years_to_process))
+        
+    # Sort results to maintain chronological order
+    results.sort(key=lambda x: x["year"])
+    results_summary.extend(results)
 
     return results_summary

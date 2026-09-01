@@ -1,0 +1,14 @@
+fastapi
+uvicorn
+earthengine-api
+geemap
+geopandas
+shapely
+scikit-learn
+scikit-image
+rasterio
+numpy
+pandas
+matplotlib
+python-multipart
+scipy

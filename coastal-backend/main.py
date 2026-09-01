@@ -11,9 +11,9 @@ import ee
 try:
     ee.Initialize(project="ee-yallajaswanth2")
     print("Earth Engine initialized")
-except Exception:
-    ee.Authenticate()
-    ee.Initialize(project="ee-yallajaswanth2")
+except Exception as e:
+    print(f"Warning: Earth Engine failed to initialize on startup: {e}")
+    print("You may need to check your network connection or run `ee.Authenticate()` manually.")
 
 app = FastAPI()
 
@@ -45,6 +45,21 @@ app.add_middleware(
     allow_methods=["*"],    # allow POST, GET, OPTIONS, etc
     allow_headers=["*"],    # allow any headers
 )
+
+def update_run_metadata(new_data):
+    import json, os
+    os.makedirs("data", exist_ok=True)
+    path = "data/run_metadata.json"
+    data = {}
+    if os.path.exists(path):
+        try:
+            with open(path, "r") as f:
+                data = json.load(f)
+        except Exception:
+            pass
+    data.update(new_data)
+    with open(path, "w") as f:
+        json.dump(data, f)
 
 class AOIRequest(BaseModel):
     coordinates: list  # list of polygons, each polygon is list of [lon, lat] pairs
@@ -78,11 +93,17 @@ async def extract_images(aoi: AOIRequest):
 
         # Project to UTM to compute area in m²
         gdf_utm = gdf.to_crs(epsg=32644)  # choose correct UTM zone for your region
-        total_area_m2 = gdf_utm['geometry'].area.sum()
+        total_area_m2 = float(gdf_utm['geometry'].area.sum())
         print(f"Total AOI area (m²): {total_area_m2}")
+        
+        update_run_metadata({
+            "coordinates": aoi.coordinates,
+            "aoi_m2": total_area_m2,
+            "aoi_km2": total_area_m2 / 1_000_000
+        })
 
         # Initialize Earth Engine
-        ee.Initialize(project="ee-jaswanthyalla123")
+        ee.Initialize(project="ee-yallajaswanth2")
         print("earth engine intialized")
         ee_polygons = []
         for i, poly_coords in enumerate(aoi.coordinates):
@@ -111,9 +132,26 @@ async def extract_images(aoi: AOIRequest):
 @app.get("/shoreline-data/")
 def get_shoreline_data():
     import json
+    import os
     try:
         from pyproj import Transformer
-        path = "data/shorelines_data/predicted_shoreline_points_2025.geojson"
+        
+        # Determine the latest prediction year
+        prediction_year = 2025
+        metadata_path = "data/run_metadata.json"
+        if os.path.exists(metadata_path):
+            try:
+                with open(metadata_path, "r") as f:
+                    metadata = json.load(f)
+                    prediction_year = metadata.get("prediction_year", 2025)
+            except Exception:
+                pass
+                
+        path = f"data/shorelines_data/predicted_shoreline_points_{prediction_year}.geojson"
+        
+        if not os.path.exists(path):
+            raise HTTPException(status_code=404, detail="Shoreline data not found for the requested year.")
+
         with open(path) as f:
             gj = json.load(f)
 
@@ -126,27 +164,116 @@ def get_shoreline_data():
 
         gj["crs"] = {"type": "name", "properties": {"name": "urn:ogc:def:crs:OGC:1.3:CRS84"}}
         return JSONResponse(gj)
+    except HTTPException as e:
+        raise e
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/extracted-shorelines/")
+def get_extracted_shorelines():
+    import json
+    import os
+    try:
+        from pyproj import Transformer
+        path = "shorelines.geojson"
+        
+        if not os.path.exists(path):
+            return JSONResponse({"type": "FeatureCollection", "features": []})
+            
+        with open(path) as f:
+            gj = json.load(f)
 
-    
+        # Convert from UTM EPSG:32644 to WGS84 EPSG:4326
+        transformer = Transformer.from_crs("EPSG:32644", "EPSG:4326", always_xy=True)
+        for feature in gj["features"]:
+            if feature["geometry"]["type"] == "LineString":
+                new_coords = []
+                for coords in feature["geometry"]["coordinates"]:
+                    lon, lat = transformer.transform(coords[0], coords[1])
+                    new_coords.append([lon, lat])
+                feature["geometry"]["coordinates"] = new_coords
+            elif feature["geometry"]["type"] == "MultiLineString":
+                new_multi = []
+                for linestring in feature["geometry"]["coordinates"]:
+                    new_coords = []
+                    for coords in linestring:
+                        lon, lat = transformer.transform(coords[0], coords[1])
+                        new_coords.append([lon, lat])
+                    new_multi.append(new_coords)
+                feature["geometry"]["coordinates"] = new_multi
+
+        gj["crs"] = {"type": "name", "properties": {"name": "urn:ogc:def:crs:OGC:1.3:CRS84"}}
+        return JSONResponse(gj)
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/erosion-geojson/")
+def get_erosion_geojson():
+    import json
+    import os
+    try:
+        path = "data/erosion_results.geojson"
+        if os.path.exists(path):
+            with open(path, "r") as f:
+                gj = json.load(f)
+            return JSONResponse(gj)
+        return JSONResponse({"type": "FeatureCollection", "features": []})
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
  
+@app.get("/transects/")
+def get_transects():
+    import json
+    import os
+    try:
+        from pyproj import Transformer
+        path = "transects.geojson"
+        if not os.path.exists(path):
+            return JSONResponse({"type": "FeatureCollection", "features": []})
+        with open(path) as f:
+            gj = json.load(f)
+
+        # Convert from UTM EPSG:32644 to WGS84 EPSG:4326
+        transformer = Transformer.from_crs("EPSG:32644", "EPSG:4326", always_xy=True)
+        for feature in gj["features"]:
+            if feature["geometry"]["type"] == "LineString":
+                new_coords = []
+                for coords in feature["geometry"]["coordinates"]:
+                    lon, lat = transformer.transform(coords[0], coords[1])
+                    new_coords.append([lon, lat])
+                feature["geometry"]["coordinates"] = new_coords
+
+        gj["crs"] = {"type": "name", "properties": {"name": "urn:ogc:def:crs:OGC:1.3:CRS84"}}
+        return JSONResponse(gj)
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.get("/api/dashboard-data/")
 def get_dashboard_data():
-    results_summary = [
-    {'year': 2016, 'ndwi_file': 'data/output//NDWI_2016.tif', 'download_status': 'success', 'water_percentage': 56.07227943807111}, 
-    {'year': 2017, 'ndwi_file': 'data/output//NDWI_2017.tif', 'download_status': 'success', 'water_percentage': 54.90235344782577}, 
-    {'year': 2018, 'ndwi_file': 'data/output//NDWI_2018.tif', 'download_status': 'success', 'water_percentage': 54.75991243995314}, 
-    {'year': 2019, 'ndwi_file': 'data/output//NDWI_2019.tif', 'download_status': 'success', 'water_percentage': 54.8587801653437}, 
-    {'year': 2020, 'ndwi_file': 'data/output//NDWI_2020.tif', 'download_status': 'success', 'water_percentage': 55.55469121487637}, 
-    {'year': 2021, 'ndwi_file': 'data/output//NDWI_2021.tif', 'download_status': 'success', 'water_percentage': 56.277758914126466}, 
-    {'year': 2022, 'ndwi_file': 'data/output//NDWI_2022.tif', 'download_status': 'success', 'water_percentage': 56.36416962148536}, 
-    {'year': 2023, 'ndwi_file': 'data/output//NDWI_2023.tif', 'download_status': 'success', 'water_percentage': 54.85636234749789}, 
-    {'year': 2024, 'ndwi_file': 'data/output//NDWI_2024.tif', 'download_status': 'success', 'water_percentage': 50.38080631071482}, 
-    {'year': 2025, 'ndwi_file': 'data/output//NDWI_2025.tif', 'download_status': 'success', 'water_percentage': 56.456519750943734}
-    ]
+    import json, os
+    path = "data/run_metadata.json"
+    metadata = {}
+    if os.path.exists(path):
+        try:
+            with open(path, "r") as f:
+                metadata = json.load(f)
+        except Exception:
+            pass
+
+    results_summary = metadata.get("image_stats", [])
+    # Sort by year just in case
+    results_summary = sorted(results_summary, key=lambda x: x["year"])
+
+    # If no data is available yet, provide a single dummy entry so charts don't break completely
+    if not results_summary:
+        results_summary = [
+            {'year': 2020, 'cleaned_path': 'data/cleaned_output/NDWI_2020.tif', 'water_percentage': 50.0}
+        ]
 
     years = [r["year"] for r in results_summary]
     water_percent = [r["water_percentage"] for r in results_summary]
@@ -156,9 +283,12 @@ def get_dashboard_data():
         "years": years,
         "water_percent": water_percent,
         "land_percent": land_percent,
-        "mean_ndwi": [round(w / 100, 2) for w in water_percent],  # dummy NDWI values
-        "aoi_km2": 12.34,
-        "aoi_m2": 12340000,
+        "mean_ndwi": [round((w/100)*0.6, 2) for w in water_percent],  # dummy NDWI scaling using water%
+        "aoi_km2": metadata.get("aoi_km2", 12.34),
+        "aoi_m2": metadata.get("aoi_m2", 12340000),
+        "coordinates": metadata.get("coordinates", []),
+        "erosion_stats": metadata.get("erosion_stats", None),
+        "prediction_year": metadata.get("prediction_year", 2025),
         "num_images": len(results_summary),
         "start_year": years[0],
         "end_year": years[-1],
@@ -187,10 +317,24 @@ async def clean_images(
 
     # Run your cleaning function on all TIFFs in the input folder
     results = image_cleaning.clean_and_crop_ndwi_folder(input_folder, output_folder)
+    
+    # Strip non-serializable objects (like good_contours) before saving to metadata
+    image_stats = []
+    for r in results:
+        if r:
+            image_stats.append({
+                "year": r["year"],
+                "cleaned_path": r["cleaned_path"],
+                "water_percentage": r["water_percentage"]
+            })
+            
+    update_run_metadata({
+        "image_stats": image_stats
+    })
 
     return {
         "status": "success",
-        "processed_files": [os.path.basename(r[0]) for r in results if r],
+        "processed_files": [os.path.basename(r["cleaned_path"]) for r in results if r],
     }
 
 # -----------------------------
@@ -216,7 +360,10 @@ async def extract_shorelines():
 @app.post("/generate-transects/")
 async def generate_transects():
     try:
+        import os
         import geopandas as gpd
+        if not os.path.exists("shorelines.geojson"):
+            return {"message": "No shorelines exist to generate transects. Please draw an area with a visible coastline."}
         gdf = gpd.read_file("shorelines.geojson")
         result = transect_baseline_generation.process_shorelines_transects(gdf)
         return {"message": "Transects generated and shoreline distances extracted"}
@@ -247,6 +394,10 @@ async def predict_shoreline(future_year: int):
         import json
         with open(f"data/shorelines_data/predicted_shoreline_points_{future_year}.geojson", "w") as f:
             json.dump(result["predicted_points"], f)
+        
+        update_run_metadata({
+            "prediction_year": future_year
+        })
             
         return {"message": f"Shoreline predicted for {future_year}", "details": result}
     except Exception as e:
@@ -257,10 +408,20 @@ async def predict_shoreline(future_year: int):
 # 7️⃣ Erosion & Accretion Calculation
 # -----------------------------
 @app.post("/calculate-erosion/")
-async def calculate_erosion():
+async def calculate_erosion(future_year: int = 2025):
     try:
-        result = erosion_accretion_calculator.calculate_erosion_accretion()
-        return {"message": "Erosion/Accretion calculated", "stats": result["stats"], "results": result["results"]}
+        import os
+        shoreline_future_file = f"data/shorelines_data/predicted_shoreline_points_{future_year}.geojson"
+        
+        result = erosion_accretion_calculator.calculate_erosion_accretion(
+            shoreline_future_file=shoreline_future_file,
+            future_year=future_year
+        )
+        update_run_metadata({
+            "erosion_stats": result["stats"],
+            "prediction_year": future_year
+        })
+        return {"message": "Erosion/Accretion calculated", "stats": result["stats"], "results": result["results"], "geojson": result.get("geojson")}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

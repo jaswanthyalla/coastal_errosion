@@ -8,6 +8,8 @@ from scipy.ndimage import median_filter
 from skimage import filters, measure
 import geopandas as gpd
 from shapely.geometry import LineString
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from matplotlib import cm
 

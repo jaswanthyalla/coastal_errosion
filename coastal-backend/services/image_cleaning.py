@@ -114,16 +114,31 @@ def clean_and_crop_ndwi_folder(
 
         # Optional PNG
         if save_png:
-            plt.figure(figsize=(8, 6))
-            plt.imshow(ndwi, cmap='Blues', vmin=-1, vmax=1)
-            for contour in good_contours:
-                plt.plot(contour[:, 1], contour[:, 0], color='red', linewidth=1.5)
-            plt.axis('off')
-            png_path = os.path.join(output_folder, f"plot_{os.path.splitext(os.path.basename(file_path))[0]}.png")
-            plt.savefig(png_path, bbox_inches='tight', dpi=150)
-            plt.close()
+            try:
+                plt.figure(figsize=(8, 6))
+                plt.imshow(ndwi, cmap='Blues', vmin=-1, vmax=1)
+                for contour in good_contours:
+                    plt.plot(contour[:, 1], contour[:, 0], color='red', linewidth=1.5)
+                plt.axis('off')
+                png_path = os.path.join(output_folder, f"plot_{os.path.splitext(os.path.basename(file_path))[0]}.png")
+                plt.savefig(png_path, dpi=150)
+            except Exception as e:
+                print(f"Failed to save PNG for {file_path}: {e}")
+            finally:
+                plt.close()
 
-        return cleaned_path, good_contours
+        # Calculate water percentage
+        water_percentage = float(water_mask_clean.sum() / water_mask_clean.size * 100)
+        import re
+        match = re.search(r'\d{4}', os.path.basename(file_path))
+        year = int(match.group()) if match else 0
+
+        return {
+            "year": year,
+            "cleaned_path": cleaned_path,
+            "water_percentage": water_percentage,
+            "good_contours": good_contours
+        }
 
     # -----------------------------
     # Helper: Auto-crop black borders
