@@ -7,6 +7,17 @@ import os
 import shutil
 from fastapi.staticfiles import StaticFiles
 import ee
+import os
+import json
+
+# Setup Earth Engine Credentials on Render
+EE_CREDS = os.environ.get("EE_CREDENTIALS")
+if EE_CREDS:
+    creds_dir = os.path.expanduser("~/.config/earthengine")
+    os.makedirs(creds_dir, exist_ok=True)
+    with open(os.path.join(creds_dir, "credentials"), "w") as f:
+        f.write(EE_CREDS)
+    print("Earth Engine credentials successfully loaded from Render Environment.")
 
 try:
     ee.Initialize(project="ee-yallajaswanth2")
